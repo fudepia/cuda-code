@@ -6,11 +6,12 @@ using namespace std;
 
 
 __global__ void readFirst(coord<int> *x) {
-    printf("CUDA* %d\n", (*x).d[0]);
+    printf("CUDA* %d\n", *((*x).d+7));
 }
 
 void readFirstC(coord<int> *x) {
-    printf("%d\n", (*x).d[0]);
+    //printf("%d\n", (*x).d[7]);
+    (*x).print();
 }
 int main() {
     coord<int> a={2,0,2,0,1,2,2,4};
@@ -31,9 +32,9 @@ int main() {
     readFirstC(ah);
     readFirst<<<1,1>>>(ad);
     cudaDeviceSynchronize();
-    cudaMemcpy(bd, ad, nB, cudaMemcpyDeviceToDevice); //Need work, shallow copy
-    readFirst<<<1,1>>>(bd);
-    cudaDeviceSynchronize();
+//    cudaMemcpy(bd, ad, nB, cudaMemcpyDeviceToDevice); //Need work, shallow copy
+//    readFirst<<<1,1>>>(bd);
+//    cudaDeviceSynchronize();
     coord<int> *bh=(*ad).pull();
     readFirstC(bh);
 //    for(di i=0;i<8;i++) cout << *((*bh).d+i) << ", ";

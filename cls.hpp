@@ -58,6 +58,7 @@ struct coord {
         d={r*cos(t), r*sin(t)};
     }
     CUDA_CALLABLE_MEMBER coord(initializer_list<T> l): dim{l.size()} {
+        //printf("init %p\n", this);
         //d=(T *)calloc(dim, sizeof(T));
         d=new T[dim];
         memcpy(d, l.begin(), sizeof(T)*dim);
@@ -68,19 +69,31 @@ struct coord {
         //delete[]d;
         free(d);
         #else
-        cout << "dsrt: "<< d << endl;
+        cudaPointerAttributes attributes;
+        gpuErrchk(cudaPointerGetAttributes(&attributes, d));
+        //cout << "Type: " << attributes.type << endl;
+        //cout << "dsrt: "<< d << endl;
+        if(attributes.type == 0) {
+            free(d);
+        } else if(attributes.type==1) {
+            free(d);
+        } else if(attributes.type==2) {
+            gpuErrchk(cudaFree(d));
+        } else {
+            // This is cudaMemoryTypeManaged memory, which no idea what this is...
+        }
         //delete[]d;
         //gpuErrchk(cudaFree(d));// GPUassert: invalid argument cls.hpp 72  
         #endif
     }
     CUDA_CALLABLE_MEMBER coord(const coord<T> &other): dim(other.dim) {
-        printf("copy ro3");
+        //printf("copy ro3");
         d=new T[dim];
         memcpy(d, other.d, sizeof(T)*dim);
     }
     CUDA_CALLABLE_MEMBER coord(coord<T> &&other) noexcept: d(std::exchange(other.d, nullptr)), dim(std::exchange(other.dim,(di)0)) {}
     CUDA_CALLABLE_MEMBER coord& operator=(const coord<T> &other) {
-        printf("move ro3");
+        //printf("move ro3");
         if (this == &other) return *this;
         dim=other.dim;
         d=new T[dim];
@@ -96,11 +109,14 @@ struct coord {
         coord<T> *dest;
         auto nB=sizeof(cpy);
         auto dB=sizeof(sizeof(T)*dim);
+        auto oldAdr=cpy.d;
         gpuErrchk(cudaMalloc((void **) &dest, nB));
         gpuErrchk(cudaMalloc((void **) &(cpy.d), nB));
-        gpuErrchk(cudaMemcpy((cpy.d), (*this).d, dB, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(cpy.d, (*this).d, dB, cudaMemcpyHostToDevice));
+        //cout << "Cpy: " << cpy.d << endl;
         gpuErrchk(cudaMemcpy(dest, &cpy, nB, cudaMemcpyHostToDevice));
-        cout << "Cpy: " << cpy.d << endl;
+        cpy.d=oldAdr;
+        //cout << "Rmed: " << cpy.d << endl;
         return dest;
     }
     coord<T>* pull() {
@@ -182,6 +198,13 @@ struct coord {
             os << ", " << crd[i];
         }
         return os;
+    }
+    CUDA_CALLABLE_MEMBER void print() {
+        printf("(%d", *d);
+        for(di i=1; i<dim; i++) {
+            printf(", %d", *(d+i));
+        }
+        printf(")\n");
     }
     friend coord<T> operator+(coord<T> lhs, const coord<T> &r) { return lhs+=r; }
     friend coord<T> operator-(coord<T> lhs, const coord<T> &r) { return lhs-=r; }
